@@ -1,0 +1,76 @@
+name: Deploy to host (self-hosted + LFS model)
+
+on:
+  push:
+    branches: [ main ]          # поменяй при необходимости
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-selfhosted-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # ВАЖНО: лейблы должны совпадать с теми, что ты задал на раннере
+    runs-on: [self-hosted, Linux, X64, deploy]
+
+    steps:
+      - name: Ensure git-lfs present
+        run: |
+          set -e
+          if ! command -v git-lfs >/dev/null 2>&1; then
+            if command -v apt-get >/dev/null 2>&1; then
+              sudo apt-get update -y
+              sudo apt-get install -y git-lfs
+            elif command -v dnf >/dev/null 2>&1; then
+              sudo dnf install -y git-lfs
+            elif command -v yum >/dev/null 2>&1; then
+              sudo yum install -y git-lfs
+            elif command -v apk >/dev/null 2>&1; then
+              sudo apk add --no-cache git-lfs
+            else
+              echo "git-lfs not found and package manager is unknown"; exit 1
+            fi
+          fi
+          git lfs install
+
+      - name: Checkout repository (with pointers)
+        uses: actions/checkout@v4
+        with:
+          lfs: false            # сами вызовем pull целенаправленно
+          fetch-depth: 1
+
+      - name: Pull model via Git LFS
+        run: |
+          set -e
+          echo "LFS pointers in repo:"
+          git lfs ls-files || true
+
+          # Тянем именно папку с моделью
+          git lfs pull --include="runs/rubert_base/*" --exclude=""
+
+          # sanity-check: веса и файлы токенизатора должны быть на месте
+          test -f runs/rubert_base/model.safetensors -o -f runs/rubert_base/pytorch_model.bin
+          test -f runs/rubert_base/config.json
+          ls -1 runs/rubert_base | egrep -q 'tokenizer|vocab|merges|tokenizer\.model|special_tokens_map'
+
+      - name: Show Docker versions (debug)
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Build & Up
+        env:
+          DOCKER_BUILDKIT: 1
+        run: |
+          set -e
+          # убедись, что .dockerignore НЕ отрезает runs/rubert_base
+          docker compose build --build-arg MODEL_RELATIVE_PATH=runs/rubert_base
+          docker compose up -d --remove-orphans
+          docker image prune -f
+
+      - name: Smoke-check
+        run: |
+          sleep 2
+          curl -fsS http://localhost:8000/health
+          curl -fsS http://localhost:8000/debug/model
