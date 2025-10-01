@@ -8,3 +8,5 @@ artifacts/
 data/
 *.safetensors
 *.bin
+.idea/
+**/.idea/
