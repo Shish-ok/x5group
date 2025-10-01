@@ -3,10 +3,4 @@ runs/rubert_base/checkpoint-3066/
 runs/rubert_base/checkpoint-6132/
 runs/rubert_base/checkpoint-9198/
 runs/rubert_base/checkpoint-12264/
-.idea/runs/
-artifacts/
-data/
-*.safetensors
-*.bin
 .idea/
-**/.idea/
