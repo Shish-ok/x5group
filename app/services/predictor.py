@@ -15,12 +15,9 @@ class _StubNer:
         spans: List[Span] = []
         if not text:
             return spans
-        tokens = list(_token_re.finditer(text))
-        for i, m in enumerate(tokens):
+        for i, m in enumerate(_token_re.finditer(text)):
             start = m.start()
-            if i > 0 and start > 0 and text[start - 1] == " ":
-                start -= 1
-            end = m.end() - 1  # inclusive
+            end = m.end()
             tag = "B-TYPE" if i == 0 else "I-TYPE"
             spans.append({"start_index": start, "end_index": end, "entity": tag})
         return spans
