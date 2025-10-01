@@ -1,0 +1,11 @@
+[
+  "O",
+  "B-TYPE",
+  "I-TYPE",
+  "B-BRAND",
+  "I-BRAND",
+  "B-VOLUME",
+  "I-VOLUME",
+  "B-PERCENT",
+  "I-PERCENT"
+]

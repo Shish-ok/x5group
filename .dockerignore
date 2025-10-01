@@ -1,0 +1,28 @@
+# OS/IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+env/
+venv/
+
+# Caches/logs
+*.log
+.cache/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Данные/артефакты по умолчанию не тащим
+data/**
+artifacts/**
+runs/**
+
+# НО: оставить папку с моделью
+!runs/
+!runs/rubert_base/
+!runs/rubert_base/**

@@ -1,0 +1,18 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MODEL_RELATIVE_PATH: runs/rubert_base
+    image: ner-api:with-model
+    container_name: ner-api
+    environment:
+      USE_TRANSFORMERS: "1"
+      MODEL_PATH: /models/rubert_base
+      DEVICE: cpu
+      REQUEST_TIMEOUT_S: "0.95"
+      WEB_CONCURRENCY: "2"
+    ports:
+      - "8000:8000"
+    restart: unless-stopped

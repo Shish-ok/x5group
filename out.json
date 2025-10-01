@@ -1,0 +1,122 @@
+{
+  "text": "вода газированная красная цена 0.5 л",
+  "tokens": [
+    "вода",
+    "гази",
+    "##рованная",
+    "красная",
+    "цена",
+    "0",
+    ".",
+    "5",
+    "л"
+  ],
+  "offsets": [
+    [
+      0,
+      4
+    ],
+    [
+      5,
+      9
+    ],
+    [
+      9,
+      17
+    ],
+    [
+      18,
+      25
+    ],
+    [
+      26,
+      30
+    ],
+    [
+      31,
+      32
+    ],
+    [
+      32,
+      33
+    ],
+    [
+      33,
+      34
+    ],
+    [
+      35,
+      36
+    ]
+  ],
+  "bio": [
+    "B-TYPE",
+    "B-TYPE",
+    "I-TYPE",
+    "B-BRAND",
+    "B-BRAND",
+    "B-VOLUME",
+    "I-VOLUME",
+    "I-VOLUME",
+    "B-VOLUME"
+  ],
+  "spans": [
+    {
+      "start_index": 0,
+      "end_index": 4,
+      "entity": "TYPE"
+    },
+    {
+      "start_index": 5,
+      "end_index": 17,
+      "entity": "TYPE"
+    },
+    {
+      "start_index": 18,
+      "end_index": 25,
+      "entity": "BRAND"
+    },
+    {
+      "start_index": 26,
+      "end_index": 30,
+      "entity": "BRAND"
+    },
+    {
+      "start_index": 31,
+      "end_index": 36,
+      "entity": "VOLUME"
+    }
+  ],
+  "entities": [
+    {
+      "start_index": 0,
+      "end_index": 4,
+      "entity": "TYPE",
+      "text": "вода"
+    },
+    {
+      "start_index": 5,
+      "end_index": 17,
+      "entity": "TYPE",
+      "text": "газированная"
+    },
+    {
+      "start_index": 18,
+      "end_index": 25,
+      "entity": "BRAND",
+      "text": "красная"
+    },
+    {
+      "start_index": 26,
+      "end_index": 30,
+      "entity": "BRAND",
+      "text": "цена"
+    },
+    {
+      "start_index": 31,
+      "end_index": 36,
+      "entity": "VOLUME",
+      "text": "0.5 л"
+    }
+  ]
+}
