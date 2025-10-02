@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import datetime
 import json
@@ -7,7 +9,6 @@ from app.schemas.predict import PredictIn, PredictOut
 from app.core.config import settings
 from app.utils.reqlog import make_request_record
 
-from __future__ import annotations
 import time
 from typing import List, Literal
 from pydantic import BaseModel, Field
