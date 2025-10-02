@@ -13,4 +13,7 @@ class Settings(BaseSettings):
     model_name: str | None = os.getenv("MODEL_NAME")
     device: str | None = os.getenv("DEVICE")
 
+    request_log_enabled: bool = True
+    request_log_dir: str = "/var/log/ner"
+
 settings = Settings()
