@@ -11,7 +11,7 @@ services:
       USE_TRANSFORMERS: "1"
       MODEL_PATH: /models/rubert_base
       DEVICE: cpu
-      REQUEST_TIMEOUT_S: "0.95"
+      REQUEST_TIMEOUT_S: "3"
       WEB_CONCURRENCY: "2"
     ports:
       - "8000:8000"
