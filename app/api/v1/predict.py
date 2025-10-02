@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import datetime
+from datetime import datetime, timezone
 import json
 import os
 from fastapi import APIRouter, HTTPException, Request
@@ -58,7 +58,7 @@ async def predict(body: PredictIn, request: Request) -> PredictOut:
     # 3) лог в JSONL (по строке на запрос), путь смонтирован на хост
     if _REQUEST_LOG_ENABLED:
         rec = {
-            "ts": datetime.utcnow().isoformat(timespec="milliseconds") + "Z",
+            "ts": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
             "path": "/api/predict",
             "client_ip": request.client.host if request.client else None,
             "latency_ms": round((time.perf_counter() - t0) * 1000.0, 1),
