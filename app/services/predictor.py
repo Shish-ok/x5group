@@ -1,26 +1,41 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional
 
 from app.core.config import settings
 
+logger = logging.getLogger("ner")
+
 Span = Dict[str, int | str]
-_token_re = re.compile(r"\S+")
+_WORD_RE = re.compile(r"\w+|[^\w\s]+", flags=re.UNICODE)
+
 
 class _StubNer:
     def predict(self, text: str) -> List[Span]:
-        spans: List[Span] = []
         if not text:
-            return spans
-        for i, m in enumerate(_token_re.finditer(text)):
-            start = m.start()
-            end = m.end()
-            tag = "B-TYPE" if i == 0 else "I-TYPE"
-            spans.append({"start_index": start, "end_index": end, "entity": tag})
+            return []
+        spans: List[Span] = []
+        words = list(_WORD_RE.finditer(text))
+        in_seq = False
+        for m in words:
+            tag = "I-TYPE" if in_seq else "B-TYPE"
+            spans.append({"start_index": m.start(), "end_index": m.end(), "entity": tag})
+            in_seq = True
         return spans
+
+
+def _label_to_ent(label: str) -> str | None:
+    if label == "O":
+        return None
+    if "-" in label:
+        _, ent = label.split("-", 1)
+        return ent
+    return label  # fallback
 
 
 class _TfNer:
@@ -28,23 +43,27 @@ class _TfNer:
         from transformers import AutoTokenizer, AutoModelForTokenClassification  # type: ignore
         import torch  # type: ignore
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path or model_name)  # type: ignore[arg-type]
-        self.model = AutoModelForTokenClassification.from_pretrained(model_path or model_name)  # type: ignore[arg-type]
+        src = model_path or model_name
+        if not src:
+            raise ValueError("Either model_path or model_name must be provided")
+
+        self.tokenizer = AutoTokenizer.from_pretrained(src)  # type: ignore[arg-type]
+        self.model = AutoModelForTokenClassification.from_pretrained(src)  # type: ignore[arg-type]
         self.model.eval()
 
-        if device_hint:
-            self.device = torch.device(device_hint)
-        else:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device_str = device_hint or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(device_str)
         self.model.to(self.device)
 
         self.id2label = self.model.config.id2label
+        logger.info("NER mode: transformers | src=%s | device=%s | labels=%s",
+                    src, self.device, list(self.id2label.values()))
 
     def predict(self, text: str) -> List[Span]:
-        if not text:
+        if not text.strip():
             return []
 
-        import torch  # type: ignore
+        import torch
 
         with torch.inference_mode():
             enc = self.tokenizer(
@@ -53,46 +72,46 @@ class _TfNer:
                 return_tensors="pt",
                 truncation=True,
             )
-            offsets = enc["offset_mapping"][0].tolist()
-            inputs = {k: v.to(self.device) for k, v in enc.items() if k != "offset_mapping"}
+            offsets = enc.pop("offset_mapping")[0].tolist()
+            inputs = {k: v.to(self.device) for k, v in enc.items()}
+
             logits = self.model(**inputs).logits[0]
             pred_ids = logits.argmax(-1).tolist()
 
-        # собираем BIO-спаны по символам (inclusive end)
+        sub = []
+        for (s, e), pid in zip(offsets, pred_ids):
+            if e == 0:
+                continue
+            sub.append(((int(s), int(e)), self.id2label[pid]))
         spans: List[Span] = []
-        current: Optional[List[int | str]] = None
+        words = list(_WORD_RE.finditer(text))
+        prev_ent: Optional[str] = None
 
-        for (start, end), pid in zip(offsets, pred_ids):
-            if end == 0:
+        for w in words:
+            ws, we = w.start(), w.end()
+
+            labs: List[str] = []
+            for (ts, te), lab in sub:
+                if te <= ws or ts >= we:
+                    continue
+                labs.append(lab)
+
+            ents = [_label_to_ent(l) for l in labs if l != "O"]
+            ents = [e for e in ents if e is not None]
+            if not ents:
+                prev_ent = None
                 continue
-            label = self.id2label[pid]
 
-            if label == "O":
-                if current:
-                    spans.append({"start_index": int(current[0]), "end_index": int(current[1]) - 1, "entity": str(current[2])})
-                    current = None
-                continue
+            ent = Counter(ents).most_common(1)[0][0]
+            has_b = any(l.startswith("B-") and _label_to_ent(l) == ent for l in labs)
 
-            if label.startswith("B-"):
-                if current:
-                    spans.append({"start_index": int(current[0]), "end_index": int(current[1]) - 1, "entity": str(current[2])})
-                ent = label.split("-", 1)[1]
-                current = [start, end, f"B-{ent}"]
-
-            elif label.startswith("I-"):
-                ent = label.split("-", 1)[1]
-                if current is None:
-                    current = [start, end, f"B-{ent}"]
-                else:
-                    current[1] = end  # продолжаем текущий спан
-
+            if prev_ent is None or ent != prev_ent or has_b:
+                tag = f"B-{ent}"
             else:
-                if current:
-                    spans.append({"start_index": int(current[0]), "end_index": int(current[1]) - 1, "entity": str(current[2])})
-                current = [start, end, "B-TYPE"]
+                tag = f"I-{ent}"
 
-        if current:
-            spans.append({"start_index": int(current[0]), "end_index": int(current[1]) - 1, "entity": str(current[2])})
+            spans.append({"start_index": ws, "end_index": we, "entity": tag})
+            prev_ent = ent
 
         return spans
 
@@ -104,9 +123,11 @@ class NerModel:
             try:
                 self.impl = _TfNer(settings.model_path, settings.model_name, settings.device)
             except Exception as e:
-                print(f"[warn] transformers init failed: {e}. Falling back to stub.")
-                self.impl = _StubNer()
+                logger.exception("Failed to init transformers backend")
+                raise RuntimeError(f"Transformers init failed: {e}") from e
         else:
+            logger.warning("NER mode: stub (use_transformers=%s, model_path=%s, model_name=%s)",
+                           settings.use_transformers, settings.model_path, settings.model_name)
             self.impl = _StubNer()
 
     def predict(self, text: str) -> List[Span]:
@@ -117,7 +138,7 @@ class NerModel:
         if impl is None:
             return {"mode": "unknown"}
 
-        if impl.__class__.__name__ == "_TfNer":
+        if isinstance(impl, _TfNer):
             return {
                 "mode": "transformers",
                 "model_path": getattr(settings, "model_path", None),
